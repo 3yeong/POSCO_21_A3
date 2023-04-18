@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 6
+names: ['banana', 'jelly', 'kimbap', 'ramen', 'snack_chicken', 'snack_chicken-']
+
+roboflow:
+  workspace: poscoaiacademy
+  project: snacks_detection-d2edm
+  version: 9
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/poscoaiacademy/snacks_detection-d2edm/dataset/9

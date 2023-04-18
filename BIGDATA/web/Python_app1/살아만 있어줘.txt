@@ -1,0 +1,187 @@
+# Web 구동 
+import dash
+# Web구성 Layer 설정 (View) 
+import dash_bootstrap_components as dbc
+import dash_html_components as html
+# 동적인 자료를 다룰때 사용하는 함수
+import dash_core_components as dcc
+
+# Dash 함수를 가져와 웹을 구성
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+#########################################################################################
+# 데이터를 불러와 시각화 하는 부분 (Model)
+import pandas as pd 
+import plotly.express as px 
+df1 = pd.read_csv('12_Data.csv')
+
+# 데이터를 시각화
+figure1 = px.scatter(df1, x='thickness', y='Target')
+# 관리도 시각화 thickness 항목에 대해 
+USL = df1['thickness'].mean() + df1['thickness'].std() * 3
+LSL = df1['thickness'].mean() - df1['thickness'].std() * 3
+df1_xbar = df1[['thickness']].reset_index().head(50)
+
+figure2 = px.line(df1_xbar, x= df1_xbar.index, y='thickness')
+figure2.add_hline(y= USL, line_color='Red')
+figure2.add_hline(y= LSL, line_color='Red')
+figure2.update_layout(yaxis_range = [USL+10 , LSL-10])
+figure2.update_traces(mode= 'markers+lines')
+########################################################################################
+# Web에서 입력받은 값을 Model로 처리하여 Output 계산 Part 
+from dash.dependencies import Input, Output
+from flask import Flask, request, jsonify
+import pickle
+
+app = Flask(__name__)
+
+# 모델 불러오기
+with open('model.pkl', 'rb') as f:
+    model = pickle.load(f)
+
+# Callback (Dynamic)
+@app.callback(
+    Output('result', 'children'),
+    Input('my_sex','value'),
+    Input('my_location','value'),
+    Input('Age','value'),
+    Input('Card_label','value'),
+    Input('From_customer','value'),
+    Input('my_kids','value'),
+    Input('Last_Buy','value'),
+    Input('Total_cash','value')
+)
+def predict_func(x1,x2,x3,x4,x5,x6,x7,x8):
+    input_data = pd.DataFrame([[x1,x2,x3,x4,x5,x6,x7,x8]])
+    result = model.predict(input_data)
+    return result
+
+#########################################################################################
+input_layout = [
+    #['성별', '거주지역', '연령', '결제등록카드', '유입경로', '자녀여부', '구매일로부터기간', '총결제금액']
+    ## drop drop input drop drop radio input input
+    html.Div([
+        html.Label('성별'),
+        dcc.Dropdown(
+            id='my_sex',
+            options=[
+                {'label': '남', 'value': '남'},
+                {'label': '여', 'value': '여'},
+            ],
+        )
+        ]),
+    html.Div([
+        html.Label('거주지역'),
+        dcc.Dropdown(
+            id='my_location',
+            options=[
+                {'label': '인천', 'value': '인천'},
+                {'label': '제주', 'value': '제주'},
+                {'label': '부산', 'value': '부산'},
+                {'label': '경남', 'value': '경남'},
+                {'label': '서울', 'value': '서울'},
+                {'label': '경북', 'value': '경북'},
+                {'label': '충북', 'value': '충북'},
+                {'label': '대전', 'value': '대전'},
+                {'label': '충남', 'value': '충남'},
+                {'label': '강원', 'value': '강원'},
+                {'label': '경기', 'value': '경기'},
+                {'label': '대구', 'value': '대구'},
+                {'label': '전남', 'value': '전남'},
+                {'label': '광주', 'value': '광주'},
+                {'label': '전북', 'value': '전북'}
+            ]
+            )
+        ]),
+    html.Div([
+        html.Label('연령'), 
+        dcc.Input(id='Age', placeholder='나이를 입력해주세요.', type='text')
+        ]),
+    html.Div([
+        html.Label('결제등록카드'),
+        dcc.Dropdown(
+            id='Card_label',
+            options=[
+                {'label': '국민은행', 'value': '국민은행'},
+                {'label': '하나은행', 'value': '하나은행'},
+                {'label': '기업은행', 'value': '기업은행'},
+                {'label': '신한은행', 'value': '신한은행'},
+                {'label': 'BC카드', 'value': 'BC카드'},
+                {'label': '농협회원조합', 'value': '농협회원조합'},
+                {'label': '롯데카드', 'value': '롯데카드'},
+                {'label': '대구은행', 'value': '대구은행'},
+                {'label': '우리은행', 'value': '우리은행'},
+                {'label': 'SC제일은행', 'value': 'SC제일은행'},
+                {'label': '농협중앙회', 'value': '농협중앙회'},
+                {'label': '광주은행', 'value': '광주은행'},
+                {'label': '현대카드', 'value': '현대카드'},
+                {'label': '신한카드', 'value': '신한카드'},
+                {'label': '삼성카드', 'value': '삼성카드'},
+                {'label': '국민카드', 'value': '국민카드'},
+                {'label': '외환은행', 'value': '외환은행'},
+                {'label': '새마을금고', 'value': '새마을금고'},
+                {'label': '씨티은행', 'value': '씨티은행'},
+                {'label': '미래에셋증권', 'value': '미래에셋증권'},
+                {'label': '우체국', 'value': '우체국'},
+                {'label': '부산은행', 'value': '부산은행'},
+                {'label': '신협중앙회', 'value': '신협중앙회'},
+                {'label': '경남은행', 'value': '경남은행'},  
+            ]
+            )
+        ]),
+    html.Div([
+        html.Label('유입경로'),
+        dcc.Dropdown(
+            id='From_customer',
+            options=[
+                {'label': '인스타그램', 'value': '인스타그램'},
+                {'label': '검색광고', 'value': '검색광고'},
+                {'label': '네이버블로그', 'value': '네이버블로그'},
+                {'label': '지인추천', 'value': '지인추천'},
+                {'label': '직접검색', 'value': '직접검색'},
+                {'label': '네이버카페', 'value': '네이버카페'},
+                {'label': '오픈마켓', 'value': '오픈마켓'},
+                {'label': '페이스북', 'value': '페이스북'},
+                {'label': '매장쿠폰', 'value': '매장쿠폰'},
+                {'label': '이마트', 'value': '이마트'}
+            ]
+        )
+        ]),
+    html.Div([
+        html.Label('자녀여부'),
+        dcc.Dropdown(
+            id='my_kids',
+            options=[
+                {'label': 'YES', 'value': 'Yes'},
+                {'label': 'NO', 'value': 'No'},
+            ]
+        )
+        ]),
+    
+    html.Div([
+        html.Label('구매일로부터기간'), 
+        dcc.Input(id='Last_Buy', placeholder='값을 입력해주세요', type='text')
+        ]),
+    html.Div([
+        html.Label('총결제금액'), 
+        dcc.Input(id='Total_cash', placeholder='값을 입력해주세요', type='text')
+        ])    
+]
+#########################################################################################
+# Web에 나오는화면을 구성하는 부분 (app.layout) 
+app.layout = dbc.Container(
+    # Layer 틀을 구성 
+    [
+        html.H3(children='Web Application'),
+        dbc.Col(html.Div(input_layout)),
+        html.Hr(), # 밑줄 
+        dbc.Card([
+            html.H2(id='result', className='card_title'),
+            html.P('그대의 미래는?!', className='card_text')
+        ], body=True ),
+        dcc.Graph(figure=figure1),
+        dcc.Graph(figure=figure2)
+    ] 
+)
+# Web Frame 구동
+if __name__ == '__main__' : 
+    app.run_server(debug=True)
