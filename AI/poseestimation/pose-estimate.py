@@ -1,5 +1,4 @@
 import cv2
-import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,6 +19,11 @@ from PIL import Image
 import time
 import os
 import copy
+import requests
+import hmac
+import hashlib
+import json
+
 
 cudnn.benchmark = True
 plt.ion()   # interactive mode
@@ -64,10 +68,11 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         out = cv2.VideoWriter(f"{source}_keypoint.mp4",
                             cv2.VideoWriter_fourcc(*'mp4v'), 30,
                             (resize_width, resize_height))
-
+        
+        violence_count = 0 # violece_count 0
         while(cap.isOpened): #loop until cap opened or video not complete
         
-            print("Frame {} Processing".format(frame_count+1))
+            # print("Frame {} Processing".format(frame_count+1))
 
             ret, frame = cap.read()  #get frame and success from video capture
             
@@ -106,7 +111,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                     if len(output_data):  #check if no pose
                         for c in pose[:, 5].unique(): # Print results
                             n = (pose[:, 5] == c).sum()  # detections per class
-                            print("No of Objects in Current Frame : {}".format(n))
+                            # print("No of Objects in Current Frame : {}".format(n))
 
                         for det_index, (*xyxy, conf, cls) in enumerate(reversed(pose[:,:6])): #loop over poses for drawing on frame
                             c = int(cls)  # integer class
@@ -117,16 +122,42 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                                         orig_shape=im0.shape[:2])
                         x1, y1, x2, y2 = map(int, xyxy)
                         cropped_img = im0[y1:y2, x1:x2]
-                        print(type(cropped_img))
+                        # print(type(cropped_img))
                         if cropped_img is not None and cropped_img.size != 0:
                             pass
                         pred = detect_violence(cropped_img)
                         if pred[0]: # tensor(0)
-                            print('-'*30)
+                            # print('-'*30)
                             print('violence!!!!')
+                            print(violence_count)
                             cv2.imwrite('./frames/saved_image{}_{}.jpg'.format(frame_count, det_index), cropped_img)
+                            violence_count += 1 #violence count
+
+                            if (violence_count == 20.0) or (violence_count == 20.5) : # tensor(0)
+                                violence_count += 1 #violence count
+                                print("점주에게 메시지가 전송되었습니다.")
+                                print("점주에게 메시지가 전송되었습니다.")
+                                print("점주에게 메시지가 전송되었습니다.")
+                                print("점주에게 메시지가 전송되었습니다.")
+                                print("점주에게 메시지가 전송되었습니다.")
+                                print("점주에게 메시지가 전송되었습니다.")
+                                print("점주에게 메시지가 전송되었습니다.")
+                                # cv2.imwrite('./frames/saved_image{}_{}.jpg'.format(frame_count, det_index), cropped_img)
+                                # # send SMS to specified number
+                                # api_key = "-----------"
+                                # secret_key = "------------------------"
+                                # service_id = "-----------------------"
+                                # sender_num = "----------------"
+                                # receiver_num = "--------------"
+                                # message = "Violence Detected!"
+                                # send_sms(api_key, secret_key, service_id, sender_num, receiver_num, message)
+                                # violence_count  = 0
+
                         else: # tensor(1)
                             print('normal!!!!')
+                            if violence_count > 0:
+                                violence_count -= 0.5 #violence count
+                            
               
                 end_time = time.time()  #Calculatio for FPS
                 fps = 1 / (end_time - start_time)
@@ -141,10 +172,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                     cv2.imshow("YOLOv7 Pose Estimation Demo", im0)
                     cv2.waitKey(1)  # 1 millisecond
 
-                out.write(im0)  #writing the video frame
-
-            else:
-                break
+                out.write(im0)  #writine('./frames
 
         cap.release()
         # cv2.destroyAllWindows()
@@ -153,6 +181,65 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         
         #plot the comparision graph
         plot_fps_time_comparision(time_list=time_list,fps_list=fps_list)
+
+
+def send_sms(api_key, secret_key, service_id, sender_num, receiver_num, message):
+    method = "POST"
+    url = f"https://sens.apigw.ntruss.com/sms/v2/services/{service_id}/messages"
+
+    timestamp = str(int(time.time() * 1000))
+    access_key = api_key
+    secret_key = secret_key
+
+    message_bytes = bytes(json.dumps({
+        "type": "SMS",
+        "from": sender_num,
+        "content": message,
+        "messages": [{"to": receiver_num}]
+    }), 'utf-8')
+
+    signature = make_signature(method, url, timestamp, access_key, secret_key, message_bytes)
+
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "x-ncp-apigw-timestamp": timestamp,
+        "x-ncp-iam-access-key": access_key,
+        "x-ncp-apigw-signature-v2": signature
+    }
+
+    body = {
+        "type": "SMS",
+        "from": sender_num,
+        "content": message,
+        "messages": [{"to": receiver_num}]
+    }
+
+    response = requests.post(url, headers=headers, json=body)
+
+    if response.status_code == 202: # 성공여부 확인 HTTP상태코드
+        print("SMS Sent Successfully!")
+    else:
+        print("Failed to Send SMS: {}".format(response.text))
+
+def make_signature(method, url, timestamp, access_key, secret_key, message_bytes):
+    secret_key_bytes = bytes(secret_key, 'utf-8')
+    message = f"{method} {url}\n{timestamp}\n{access_key}\n"
+    message_bytes = bytes(message, 'utf-8') + message_bytes
+
+    signing_key = hmac.new(secret_key_bytes, message_bytes, hashlib.sha256).digest()
+
+    signature = hmac.new(signing_key, message_bytes, hashlib.sha256).hexdigest()
+
+    return signature
+
+    url = "https://api-sens.ncloud.com/v1/sms/services/{}/messages".format(service_id)
+
+    response = requests.post(url, headers=headers, json=body)
+
+    if response.status_code == 202: #성공여부 확인 HTTP상태코드
+        print("SMS Sent Successfully!")
+    else:
+        print("Failed to Send SMS: {}".format(response.text))
 
 
 def parse_opt():
@@ -186,7 +273,7 @@ def detect_violence(frame):
     f = f.unsqueeze(0)
     prediction = model_pred(f)
     prediction = prediction.argmax()
-    print(prediction)
+    # print(prediction)
     predictions.append(prediction.data)
     return predictions   
     
